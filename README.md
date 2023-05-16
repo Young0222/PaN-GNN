@@ -1,7 +1,5 @@
 # PNeGNN
 
-## This is our PyTorch implementation code for our paper:
-
 ## Example : ML-1M dataset
 
 ```python
