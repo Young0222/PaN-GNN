@@ -1,4 +1,4 @@
-# PNeGNN
+# PaN-GNN
 
 ## Example : ML-1M dataset
 
