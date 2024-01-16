@@ -145,77 +145,57 @@ def main(args):
 
             ds = DataLoader(training_dataset,batch_size=args.batch_size,shuffle=True)
             q=0
-            pbar = tqdm(desc = 'Version : {} Epoch {}/{}'.format(args.version,EPOCH,args.epoch),total=len(ds),position=0)
-
-            for u,v,w,negs in ds:   
-                q+=len(u)
-                st=time.time()
-                optimizer.zero_grad()
-                
-                loss = model(u,v,w,negs,data_p,data_n,data_p_1,data_p_2,data_n_1,data_n_2,EPOCH,device) # original
             
-                loss.backward()                
-                optimizer.step()
-                LOSS+=loss.item() * len(ds)
-                
-                pbar.update(1)
-                pbar.set_postfix({'loss':loss.item()})
+            model.eval()
+            if args.aggregate == 'siren':
+                emb = model.aggregate()
+                emb_u, emb_v = torch.split(emb,[data_class.num_u,data_class.num_v])
+                emb_u = emb_u.cpu().detach()
+                emb_v = emb_v.cpu().detach()
+                r_hat = emb_u.mm(emb_v.t())
+                reco = gen_top_k(data_class,r_hat)
+            else:
+                model = torch.load("/home/xjc/222pane-gnn/rebuttal/non_graph_model/pandgnn"+str(all_i)+".pt")
+                emb_p, emb_n, _, _, _, _  = model.aggregate_u_two_embeddings(data_p,data_n,data_p_1,data_p_2,data_n_1,data_n_2)
+                emb_u, emb_v = torch.split(emb_p,[data_class.num_u,data_class.num_v])
+                emb_n_u, emb_n_v = torch.split(emb_n,[data_class.num_u,data_class.num_v])
+                emb_u = emb_u.cpu().detach(); emb_v = emb_v.cpu().detach(); emb_n_u = emb_n_u.cpu().detach(); emb_n_v = emb_n_v.cpu().detach()
+                # np.save('emb_u.npy', emb_u)
+                # np.save('emb_v.npy', emb_v)
+                r_hat = emb_u.mm(emb_v.t())
+                r_hat_n = emb_n_u.mm(emb_n_v.t())
+                reco = gen_top_k_new3(data_class, r_hat, r_hat_n)
+            
 
-            pbar.close()
-
-            if EPOCH%20 ==1:
-
-                model.eval()
-                if args.aggregate == 'siren':
-                    emb = model.aggregate()
-                    emb_u, emb_v = torch.split(emb,[data_class.num_u,data_class.num_v])
-                    emb_u = emb_u.cpu().detach()
-                    emb_v = emb_v.cpu().detach()
-                    r_hat = emb_u.mm(emb_v.t())
-                    reco = gen_top_k(data_class,r_hat)
-                else:
-                    torch.save(model, '333pandgnn'+str(all_i)+'.pt')
-                    emb_p, emb_n, _, _, _, _  = model.aggregate_u_two_embeddings(data_p,data_n,data_p_1,data_p_2,data_n_1,data_n_2)
-                    emb_u, emb_v = torch.split(emb_p,[data_class.num_u,data_class.num_v])
-                    emb_n_u, emb_n_v = torch.split(emb_n,[data_class.num_u,data_class.num_v])
-                    emb_u = emb_u.cpu().detach(); emb_v = emb_v.cpu().detach(); emb_n_u = emb_n_u.cpu().detach(); emb_n_v = emb_n_v.cpu().detach()
-                    # np.save('emb_u.npy', emb_u)
-                    # np.save('emb_v.npy', emb_v)
-                    r_hat = emb_u.mm(emb_v.t())
-                    r_hat_n = emb_n_u.mm(emb_n_v.t())
-                    reco = gen_top_k_new3(data_class, r_hat, r_hat_n)
-                
-
-                eval_ = ev(data_class,reco,args)
-                eval_.precision_and_recall()
-                eval_.normalized_DCG()
-                print("\n***************************************************************************************")
-                print(" /* Recommendation Accuracy */")
-                print('N :: %s'%(eval_.N))
-                print('Precision at :: %s'%(eval_.N), eval_.p['total'][eval_.N-1])
-                print('Recall at :: %s'%(eval_.N), eval_.r['total'][eval_.N-1])
-                print('nDCG at :: %s'%(eval_.N), eval_.nDCG['total'][eval_.N-1])
-                print('Hit at :: %s'%(eval_.N), eval_.h['total'][eval_.N-1])
-                print('TP at :: %s'%(eval_.N), eval_.tp['total'][eval_.N-1])
-                print('FP at :: %s'%(eval_.N), eval_.fp['total'][eval_.N-1])
-                print('FN at :: %s'%(eval_.N), eval_.fn['total'][eval_.N-1])
-                print("***************************************************************************************")
-                if eval_.r['total'][eval_.N-1][1] > res_r_1:
-                    res_r_1 = eval_.r['total'][eval_.N-1][1]
-                    res_p_1 = eval_.p['total'][eval_.N-1][1]
-                    res_n_1 = eval_.nDCG['total'][eval_.N-1][1]
-                    res_h_1 = eval_.h['total'][eval_.N-1][1]
-                if eval_.r['total'][eval_.N-1][2] > res_r_2:
-                    res_r_2 = eval_.r['total'][eval_.N-1][2]
-                    res_p_2 = eval_.p['total'][eval_.N-1][2]
-                    res_n_2 = eval_.nDCG['total'][eval_.N-1][2]
-                    res_h_2 = eval_.h['total'][eval_.N-1][2]
-                if eval_.r['total'][eval_.N-1][3] > res_r_3:
-                    res_r_3 = eval_.r['total'][eval_.N-1][3]
-                    res_p_3 = eval_.p['total'][eval_.N-1][3]
-                    res_n_3 = eval_.nDCG['total'][eval_.N-1][3]
-                    res_h_3 = eval_.h['total'][eval_.N-1][3]
-                model.train()
+            eval_ = ev(data_class,reco,args)
+            eval_.precision_and_recall()
+            eval_.normalized_DCG()
+            print("\n***************************************************************************************")
+            print(" /* Recommendation Accuracy */")
+            print('N :: %s'%(eval_.N))
+            print('Precision at :: %s'%(eval_.N), eval_.p['total'][eval_.N-1])
+            print('Recall at :: %s'%(eval_.N), eval_.r['total'][eval_.N-1])
+            print('nDCG at :: %s'%(eval_.N), eval_.nDCG['total'][eval_.N-1])
+            print('Hit at :: %s'%(eval_.N), eval_.h['total'][eval_.N-1])
+            print('TP at :: %s'%(eval_.N), eval_.tp['total'][eval_.N-1])
+            print('FP at :: %s'%(eval_.N), eval_.fp['total'][eval_.N-1])
+            print('FN at :: %s'%(eval_.N), eval_.fn['total'][eval_.N-1])
+            print("***************************************************************************************")
+            if eval_.r['total'][eval_.N-1][1] > res_r_1:
+                res_r_1 = eval_.r['total'][eval_.N-1][1]
+                res_p_1 = eval_.p['total'][eval_.N-1][1]
+                res_n_1 = eval_.nDCG['total'][eval_.N-1][1]
+                res_h_1 = eval_.h['total'][eval_.N-1][1]
+            if eval_.r['total'][eval_.N-1][2] > res_r_2:
+                res_r_2 = eval_.r['total'][eval_.N-1][2]
+                res_p_2 = eval_.p['total'][eval_.N-1][2]
+                res_n_2 = eval_.nDCG['total'][eval_.N-1][2]
+                res_h_2 = eval_.h['total'][eval_.N-1][2]
+            if eval_.r['total'][eval_.N-1][3] > res_r_3:
+                res_r_3 = eval_.r['total'][eval_.N-1][3]
+                res_p_3 = eval_.p['total'][eval_.N-1][3]
+                res_n_3 = eval_.nDCG['total'][eval_.N-1][3]
+                res_h_3 = eval_.h['total'][eval_.N-1][3]
 
         if EPOCH == args.epoch:
             print("Final results (R,P,N,H) are: ", res_r_2, res_p_2, res_n_2, res_h_2)

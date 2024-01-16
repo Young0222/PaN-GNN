@@ -8,21 +8,23 @@ import torch_scatter
 import sys
 import torch
 import random
-
-# from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.utils import softmax
-    
+
+
 class LightGConv(MessagePassing):
     def __init__(self):
         super().__init__(aggr='add')
         
-    def forward(self,x,edge_index):
-        row, col = edge_index
-        deg = degree(col, x.size(0), dtype=x.dtype)
-        deg_inv_sqrt = deg.pow(-0.5)
-        deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
-        norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
-        # norm = deg_inv_sqrt[row] * deg_inv_sqrt[col] * edge_rating[row,col]
+    # def forward(self,x,edge_index):
+    #     row, col = edge_index
+    #     deg = degree(col, x.size(0), dtype=x.dtype)
+    #     deg_inv_sqrt = deg.pow(-0.5)
+    #     deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
+    #     norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
+    #     out = self.propagate(edge_index, x=x, norm=norm)
+    #     return out
+
+    def forward(self, x, edge_index, norm):
         out = self.propagate(edge_index, x=x, norm=norm)
         return out
     
@@ -38,18 +40,16 @@ class LightGINConv(MessagePassing):
         self.eps = torch.nn.Parameter(torch.empty(1))
         self.eps.data.fill_(0.0)
         
-    def forward(self,x,edge_index):
-        row, col = edge_index
-        deg = degree(col, x.size(0), dtype=x.dtype)
-        deg_inv_sqrt = deg.pow(-0.5)
-        deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
-        norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
-        # norm = deg_inv_sqrt[row] * deg_inv_sqrt[col] * edge_rating[row,col]   # use edge rating 1,2,3,4,5
+    def forward(self,x,edge_index, norm, norm_self):
+        # row, col = edge_index
+        # deg = degree(col, x.size(0), dtype=x.dtype)
+        # deg_inv_sqrt = deg.pow(-0.5)
+        # deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
+        # norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
         out = self.propagate(edge_index, x=x, norm=norm)
-        norm_self = deg_inv_sqrt[range(x.size(0))] * deg_inv_sqrt[range(x.size(0))]
-        norm_self = norm_self.unsqueeze(dim=1).repeat(1,x.size(1))
+        # norm_self = deg_inv_sqrt[range(x.size(0))] * deg_inv_sqrt[range(x.size(0))]
+        # norm_self = norm_self.unsqueeze(dim=1).repeat(1,x.size(1))
         out = out + (1 + self.eps) * norm_self * x  # GIN
-        # out = out + norm_self * x  # GCN with self's feature
         return out
     
     def message(self,x_j,norm):
