@@ -16,7 +16,7 @@ The code has been tested under Python 3.7.7. The required packages are as follow
 ## Example : ML-1M dataset
 
 ```python
-python main.py --dataset ML-1M --version 1 --aggregate pandgnn --K 40 --lr 5e-4
+python main.py --dataset ML-1M --version 1 --aggregate pandgnn --K 40 --lr 5e-3
 ```
 
 ## Example : Amazon-Book dataset
